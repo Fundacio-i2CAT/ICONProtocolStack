@@ -1,0 +1,51 @@
+## begin ionadmin
+
+1 170 'custom_sdr.ionconfig'
+s
+# Contact plan definitions
+a contact +1 +86400 170 170 100000
+a contact +1 +86400 180 170 100000
+a contact +1 +86400 170 180 100000
+
+a range +1 +86400 170 170 1
+a range +1 +86400 180 170 1
+a range +1 +86400 170 180 1
+
+m production 1000000
+m consumption 1000000-
+## end ionadmin
+
+## begin ltpadmin
+1 100
+a span 180 100 100 64000 10000 1 'udplso 200.200.200.180:1113 40000000' 
+s 'udplsi 0.0.0.0:1113'
+
+## end ltpadmin
+
+## begin bpadmin
+1
+a scheme ipn 'ipnfw' 'ipnadminep'
+a endpoint ipn:170.0 q
+a endpoint ipn:170.1 q
+a endpoint ipn:170.2 q
+
+a protocol ltp 1400 100
+a protocol udp 1400 100
+
+a induct udp 0.0.0.0 udpcli
+a induct ltp 1 ltpcli
+
+a outduct udp 127.0.0.1 udpclo
+a outduct ltp 180 ltpclo
+
+s
+## end bpadmin
+
+## begin ipnadmin
+a plan 170 udp/127.0.0.1
+a plan 180 ltp/180
+## end ipnadmin
+
+## begin ionsecadmin
+1
+## end ionsecadmin
