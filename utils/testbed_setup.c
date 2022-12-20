@@ -15,20 +15,20 @@ void setup_routes(enum node_type ntype)
         break;
 
     case SAT:
+        // Route for the bundles
+        strcpy(commands, "sudo ip route add ");
+        strcat(commands, BA_IP);
+        strcat(commands, " via ");
+        strcat(commands, SAT_IP_BP);
         // Set TUN device up
-        strcpy(commands, "sudo ip addr add ");
+        strcat(commands, "\nsudo ip addr add ");
         strcat(commands, SAT_TUN_IP);
         strcat(commands, SAT_TUN_MASK);
         strcat(commands, " dev tun0 \nsudo ip link set tun0 up \nsudo ip route add ");
         // Define a route to the CN through the TUN(i.e. through the user space where the BP node is)
-        strcat(commands, CN_NET);
+        strcat(commands, CN_IP);
         strcat(commands, " via ");
         strcat(commands, SAT_TUN_IP);
-        // Route for the bundles
-        strcat(commands, "\nsudo ip route add ");
-        strcat(commands, BA_IP);
-        strcat(commands, " via ");
-        strcat(commands, SAT_IP_DL);
         // Activate ip forwarding in the kernel (it is deactivated by default)
         strcat(commands,"\nsudo sysctl -w net.ipv4.ip_forward=1 > /dev/null\n");
         break;

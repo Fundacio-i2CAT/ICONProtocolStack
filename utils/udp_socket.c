@@ -10,7 +10,7 @@
 
 #include "udp_socket.h"
 
-int setup_udp_socket(char *ipaddr, int port)
+int setup_udp_socket(const char *ipaddr, int port)
 {
     //Inicialitzar UDP socket
 	int udpsocket = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP);
@@ -40,7 +40,7 @@ int setup_udp_socket(char *ipaddr, int port)
     return udpsocket;
 }
 
-int send_udp(int udpsocket, char *msg, size_t msglen, char *ipaddr, int port)
+int send_udp(int udpsocket, const char *msg, size_t msglen, char *ipaddr, int port)
 {
     // adreça destí
 	struct sockaddr_in destiny_addr;

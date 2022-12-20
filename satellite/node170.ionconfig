@@ -3,21 +3,29 @@
 1 170 'custom_sdr.ionconfig'
 s
 # Contact plan definitions
-a contact +1 +86400 170 170 100000
-a contact +1 +86400 180 170 100000
-a contact +1 +86400 170 180 100000
+# a contact start_time stop_time source_node dest_node xmit_data_rate(bytes/s) [confidence]
+a contact +1 +86400 170 170 500000 
+a contact +271 +86400 180 170 250000
+a contact +271 +86400 170 180 250000
+# a contact +1 +86400 180 170 250000
+# a contact +1 +86400 170 180 250000
 
+
+# a range start_time stop_time one_node the_other_node distance
 a range +1 +86400 170 170 1
-a range +1 +86400 180 170 1
-a range +1 +86400 170 180 1
+a range +271 +86400 180 170 1
+a range +271 +86400 170 180 1
+# a range +1 +86400 180 170 1
+# a range +1 +86400 170 180 1
 
-m production 1000000
-m consumption 1000000-
+m production -1
+m consumption -1
 ## end ionadmin
 
 ## begin ltpadmin
 1 100
-a span 180 100 100 64000 10000 1 'udplso 200.200.200.180:1113 40000000' 
+#a span peer_engine_nbr max_export_sessions max_import_sessions max_segment_size aggregation_size_threshold aggregation_time_limit 'LSO_command' [queuing_latency]
+a span 180 100 100 640000 10000 1 'udplso 200.200.200.180:1113 40000000' 
 s 'udplsi 0.0.0.0:1113'
 
 ## end ltpadmin
@@ -29,8 +37,8 @@ a endpoint ipn:170.0 q
 a endpoint ipn:170.1 q
 a endpoint ipn:170.2 q
 
-a protocol ltp 1400 100
-a protocol udp 1400 100
+a protocol ltp
+a protocol udp
 
 a induct udp 0.0.0.0 udpcli
 a induct ltp 1 ltpcli

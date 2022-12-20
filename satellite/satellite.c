@@ -12,6 +12,7 @@
 #include "bp_node.h"
 #include "testbed_setup.h"
 
+#define N_PKT_WAIT 15
 
 // Funció que s'encarrega d'inicialitzar el TUN
 static int tun_alloc(int flags)
@@ -62,40 +63,59 @@ void *mo_thread(void *param)
 {
 	// Ignore SIGINT
 	thread_mask();
+	// Variables handling TUN and polling
 	int tun_fd = *(int*)param;
-	unsigned char buffer[IP_MAXPACKET];
-	int nread;
-	struct iphdr *pckt;
 	struct pollfd my_poll = {tun_fd, POLLIN, 0};
-	char txeid[] = SAT_MO_EID;
-	char rxeid[] = BA_MO_EID;
+	// BP ipn addresses
+	char *txeid = malloc(sizeof(SAT_MO_EID));
+	char *rxeid = malloc(sizeof(BA_MO_EID));
+	strcpy(txeid, SAT_MO_EID);
+	strcpy(rxeid, BA_MO_EID);
+
+	// Variables handling storage for calling BP at once with multiple IP packets
+	// (BP calls are more efficient this way)
+	int n_packets = 0;
+	size_t packets_size[5];
+	size_t buff_pointer = 0;
+	char my_packets[IP_MAXPACKET*5];
+	int loops = 0;
 
 	// Loop fins que premin una tecla
 	while(!terminate)
 	{
+		// Call send_bundle if at least N_PKT_WAIT packets are ready
+		// or every 20 loops if packets are available
+		if (n_packets == N_PKT_WAIT || (n_packets > 0 && loops >= 30)){
+			sem_wait(&ion_mutex);
+			if (send_bundle(txeid, rxeid, my_packets, packets_size, n_packets, (int)7200))
+			{
+				printf("Could not send bundle\n");
+				return((void*)-1);
+			}
+			sem_post(&ion_mutex);
+			buff_pointer = 0;
+			n_packets = 0;
+			loops = 0;
+		}
+		else{
+			loops++;
+		}
 		// We check if a packet was received at the TUN device
-		int ret = poll(&my_poll, 1, 50); // Wait some milisecs for inputs on TUN
+		int ret = poll(&my_poll, 1, 1); // Wait some milisecs for inputs on TUN
 
 		if (ret>0 && my_poll.revents == POLLIN) // a packet has been received at the TUN
 		{
-			nread = read(tun_fd, buffer, sizeof(buffer));
-			if (nread < 0) {
-				perror("Reading from TUN interface\n");
+			packets_size[n_packets] = read(tun_fd, my_packets+buff_pointer, IP_MAXPACKET);
+			if (packets_size[n_packets] < 0) {
+				perror("Error reading from TUN interface\n");
 				close(tun_fd);
 				exit(1);
 			}
-			pckt = (struct iphdr *) buffer;
-			if(pckt->protocol == 6 || pckt->protocol == 17) //	Ignores packets unless we receive a UDP(17) or TCP(6) one
-			{
-				printf("MO: Packet received with size %d , content(no headers): %s \n", nread, (char*)pckt+HEADER_SIZE);
-				sem_wait(&ion_mutex);
-				if (send_bundle(txeid, rxeid, (char *)pckt, nread, 0))
-				{
-					printf("Could not send bundle\n");
-					return((void*)-1);
-				}
-				sem_post(&ion_mutex);
-				memset(buffer, 0, IP_MAXPACKET);
+			// Check if its contains a UDP datagram
+			if (((struct iphdr*)(my_packets+buff_pointer))->protocol == 17){
+			// Add here extra checks (e.g: check if sender is in our database)
+				buff_pointer += packets_size[n_packets];
+				n_packets++;
 			}
 		}
 		else if (ret == 0) // Poll timeout
@@ -118,8 +138,8 @@ void *mt_thread(void *param)
 	int bytes;
 	// Rebem bundles i reenviem el contingut amb el TUN
 	char *buffer = malloc(IP_MAXPACKET);
-	char rxeid[] = SAT_MT_EID; // This is necessary to avoid seg faults in the ION code
-
+	char *rxeid = malloc(sizeof(SAT_MT_EID));
+	strcpy(rxeid, SAT_MT_EID);
 	// Loop fins que clickin ^C
 	while(!terminate){
 		// Fem poll a veure si hi ha algun bundle
@@ -133,13 +153,13 @@ void *mt_thread(void *param)
 		}
 		else if (bytes > 0) // A Bundle has been received
 		{	
-			printf("MT: Bundle received with size %d , content(no headers): %s \n", bytes, (char*)buffer+HEADER_SIZE);
-			printf("MT: Sent %d bytes as an IP+UDP packet through the TUN device\n", (int)write(tun_fd, buffer, bytes));
+			// printf("MT: Bundle received with size %d , content(no headers): %s \n", bytes, (char*)buffer+HEADER_SIZE);
+			// printf("MT: Sent %d bytes as an IP+UDP packet through the TUN device\n", (int)write(tun_fd, buffer, bytes));
+			write(tun_fd, buffer, bytes);
 			memset(buffer, 0, IP_MAXPACKET);
 		}
 		else if (bytes == 0) // Bundle polling timeout: wait and poll again
 		{
-			sleep(0.001);
 			continue;
 		}
 		else{
@@ -205,7 +225,7 @@ int main()
 	pthread_join(pthread_MT, &ret);
 	if (ret)
 	{
-		printf("An error ocurred inside pthread_MO\n");
+		printf("An error ocurred inside pthread_MT\n");
 	}
 
 	// Tanquem el TUN

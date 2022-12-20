@@ -59,7 +59,7 @@ static void thread_mask()
 	}
 }
 
-// Rebem bundles i reenviem el contingut amb el TUN
+// Receive bundles and send content through TUN
 void *mo_thread(void *param)
 {
 	// Set mask to ignore SIGINT
@@ -67,9 +67,10 @@ void *mo_thread(void *param)
 
 	int tun_fd = *(int*)param;
 	int bytes;
+	unsigned int count = 0;
 	char *buffer = malloc(IP_MAXPACKET);
-	char rxeid[] = BA_MO_EID;
-
+	char *rxeid = malloc(sizeof(BA_MO_EID));
+	strcpy(rxeid, BA_MO_EID);
 	// Loop fins que clickin ^C
 	while(!terminate){
 		// Fem poll a veure si hi ha algun bundle
@@ -83,13 +84,21 @@ void *mo_thread(void *param)
 		}
 		else if (bytes > 0) // A Bundle has been received
 		{	
-			printf("MO: Bundle received with size %d , content(no headers): %s \n", bytes, (char*)buffer+HEADER_SIZE);
-			printf("MO: Sent %d bytes as an IP+UDP packet through the TUN device\n", (int)write(tun_fd, buffer, bytes));
-			memset(buffer, 0, IP_MAXPACKET);
+			// printf("MO: Bundle received with size %d , content(no headers): %s \n", bytes, (char*)buffer+HEADER_SIZE);
+			// printf("MO: Sent %d bytes as an IP+UDP packet through the TUN device\n", (int)write(tun_fd, buffer, bytes));
+			// sscanf(buffer+HEADER_SIZE+22, "%ld", &pkt_id);
+			// printf("%ld, ", pkt_id);
+			count ++;
+			bytes = write(tun_fd, buffer, bytes);
+			if (bytes == -1){
+				perror("Some ERROR ocurred while wrting to the TUN\n");
+				printf("%d\n", bytes);
+				return ((void*)-1);
+			}
+			// memset(buffer, 0, IP_MAXPACKET);
 		}
-		else if (bytes == 0) // Bundle polling timeout: wait and poll again
+		else if (bytes == 0) // poll again
 		{
-			sleep(0.001);
 			continue;
 		}
 		else{
@@ -97,6 +106,7 @@ void *mo_thread(void *param)
 			return ((void*)-1);
 		}
 	}
+	printf("Forwarded %u packets to the CN\n", count);
 	return(NULL);
 }
 
@@ -104,40 +114,59 @@ void *mt_thread(void *param)
 {
 	// Ignore SIGINT
 	thread_mask();
+	// Variables handling TUN and polling
 	int tun_fd = *(int*)param;
-	unsigned char buffer[IP_MAXPACKET];
-	int nread;
-	struct iphdr *pckt;
 	struct pollfd my_poll = {tun_fd, POLLIN, 0};
-	char txeid[] = BA_MT_EID;
-	char rxeid[] = SAT_MT_EID;
-	
+	// BP ipn addresses
+	char *txeid = malloc(sizeof(BA_MT_EID));
+	char *rxeid = malloc(sizeof(SAT_MT_EID));
+	strcpy(txeid, BA_MT_EID);
+	strcpy(rxeid, SAT_MT_EID);
+
+	// Variables handling storage for calling BP at once with multiple IP packets
+	// (BP calls are more efficient this way)
+	int n_packets = 0;
+	size_t packets_size[5];
+	size_t buff_pointer = 0;
+	char my_packets[IP_MAXPACKET*5];
+	int loops = 0;
+
 	// Loop fins que premin una tecla
 	while(!terminate)
 	{
+		// Call send_bundle if at least 5 packets are ready
+		// or every 20 loops if packets are available
+		if (n_packets == 5 || (n_packets > 0 && loops >= 20)){
+			sem_wait(&ion_mutex);
+			if (send_bundle(txeid, rxeid, my_packets, packets_size, n_packets, 0))
+			{
+				printf("Could not send bundle\n");
+				return((void*)-1);
+			}
+			sem_post(&ion_mutex);
+			buff_pointer = 0;
+			n_packets = 0;
+			loops = 0;
+		}
+		else{
+			loops++;
+		}
 		// We check if a packet was received at the TUN device
-		int ret = poll(&my_poll, 1, 50); // Wait some milisecs for inputs on TUN
+		int ret = poll(&my_poll, 1, 1); // Wait some milisecs for inputs on TUN
 
 		if (ret>0 && my_poll.revents == POLLIN) // a packet has been received at the TUN
 		{	
-			nread = read(tun_fd, buffer, sizeof(buffer));
-			if (nread < 0) {
-				perror("Reading from TUN interface\n");
+			packets_size[n_packets] = read(tun_fd, my_packets+buff_pointer, IP_MAXPACKET);
+			if (packets_size[n_packets] < 0) {
+				perror("Error reading from TUN interface\n");
 				close(tun_fd);
 				exit(1);
 			}
-			pckt = (struct iphdr *) buffer;
-			if(pckt->protocol == 6 || pckt->protocol == 17) //	Ignores packets unless we receive a UDP(17) or TCP(6) one
-			{
-				printf("MT: Packet received with size %d , content(no headers): %s \n", nread, (char*)pckt+HEADER_SIZE);
-				sem_wait(&ion_mutex);
-				if (send_bundle(txeid, rxeid, (char *)pckt, nread, 0))
-				{
-					printf("Could not send bundle\n");
-					return((void*)-1);
-				}
-				sem_post(&ion_mutex);
-				memset(buffer, 0, IP_MAXPACKET);
+			// Check if its contains a UDP datagram
+			if (((struct iphdr*)(my_packets+buff_pointer))->protocol == 17){
+			// Add here extra checks (e.g: check if sender is in our database)
+				buff_pointer += packets_size[n_packets];
+				n_packets++;
 			}
 		}
 		else if (ret == 0) // Poll timeout

@@ -4,7 +4,7 @@
 #sdrName '../ion_sdr_files/node170'
 #sdrWmSize:       0
 configFlags 15
-#heapWords:       250000
+heapWords 10000000
 #heapKey:         -1
 #logSize:         0
 #logKey:          -1

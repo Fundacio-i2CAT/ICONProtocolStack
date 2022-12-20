@@ -4,7 +4,7 @@
 #sdrName node170.sdr
 #sdrWmSize:       0
 configFlags 15
-#heapWords:       250000
+heapWords 5000000
 #heapKey:         -1
 #logSize:         0
 #logKey:          -1

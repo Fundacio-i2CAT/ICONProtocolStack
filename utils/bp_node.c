@@ -89,9 +89,9 @@ static ReqAttendant	*_attendant(ReqAttendant *newAttendant)
 }
 
 
-int	send_bundle(char *sourceEid, char *destEid, char *text, int textlen, int ttl)
+int	send_bundle(char *sourceEid, char *destEid, char *texts, size_t *textslen, int n_texts, int ttl)
 {
-	if(!ttl)
+	if(ttl <= 0)
 	{
 		ttl = DEFAULT_TTL;
 	}
@@ -130,50 +130,48 @@ int	send_bundle(char *sourceEid, char *destEid, char *text, int textlen, int ttl
 
 	_attendant(&attendant);
 	sdr = bp_get_sdr();
-	if (text)
-	{
+	for(int i = 0; i < n_texts; i++){
+		if (texts)
+		{
+			if (textslen[i] <= 0)
+			{
+				printf("Legth of the msg must be greater than 0");
+				break;
+			}
 
-		if (textlen <= 0)
-		{
-			printf("Legth of the msg must be greater than 0");
-			bp_detach();
-			return 0;
-		}
+			CHKZERO(sdr_begin_xn(sdr));
+			extent = sdr_malloc(sdr, textslen[i]);
+			if (extent)
+			{
+				sdr_write(sdr, extent, texts, textslen[i]);
+			}
 
-		CHKZERO(sdr_begin_xn(sdr));
-		extent = sdr_malloc(sdr, textlen);
-		if (extent)
-		{
-			sdr_write(sdr, extent, text, textlen);
-		}
+			if (sdr_end_xn(sdr) < 0)
+			{
+				printf("No space for ZCO extent.");
+				bp_detach();
+				return 0;
+			}
 
-		if (sdr_end_xn(sdr) < 0)
-		{
-			printf("No space for ZCO extent.");
-			bp_detach();
-			return 0;
+			bundleZco = ionCreateZco(ZcoSdrSource, extent, 0, textslen[i],
+					BP_STD_PRIORITY, 0, ZcoOutbound, &attendant);
+			if (bundleZco == 0 || bundleZco == (Object) ERROR)
+			{
+				putErrmsg("Can't create ZCO extent.", NULL);
+				bp_detach();
+				return 0;
+			}
+			if (bp_send(NULL, destEid, NULL, ttl, BP_STD_PRIORITY,
+					NoCustodyRequested, 0, 0, NULL, bundleZco,
+					&newBundle) < 1)
+			{
+				putErrmsg("bpsource can't send ADU.", NULL);
+			}
+			// bp_close(ionsapPtr);
 		}
-
-		bundleZco = ionCreateZco(ZcoSdrSource, extent, 0, textlen,
-				BP_STD_PRIORITY, 0, ZcoOutbound, &attendant);
-		if (bundleZco == 0 || bundleZco == (Object) ERROR)
-		{
-			putErrmsg("Can't create ZCO extent.", NULL);
-			bp_detach();
-			return 0;
-		}
-		if (bp_send(NULL, destEid, NULL, ttl, BP_STD_PRIORITY,
-				NoCustodyRequested, 0, 0, NULL, bundleZco,
-				&newBundle) < 1)
-		{
-			putErrmsg("bpsource can't send ADU.", NULL);
-		}
-		// bp_close(ionsapPtr);
-		ionStopAttendant(_attendant(NULL));
-		bp_detach();
-		return 0;
+		texts += textslen[i];
 	}
-	writeMemo("[i] Stopping bpsource.");
+	writeMemo("[i] Finshed send_bundle.");
 	ionStopAttendant(_attendant(NULL));
 	bp_detach();
 	return 0;
