@@ -1,0 +1,11 @@
+#wmKey:           0
+#wmSize:          5000000
+#wmAddress:       0
+#sdrName '../ion_sdr_files/node170'
+#sdrWmSize:       0
+configFlags 15
+#heapWords:       250000
+#heapKey:         -1
+#logSize:         0
+#logKey:          -1
+pathName ..ion_sdr_files

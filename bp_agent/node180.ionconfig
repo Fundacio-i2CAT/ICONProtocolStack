@@ -1,0 +1,55 @@
+## begin ionadmin
+
+1 180 'custom_sdr.ionconfig'
+s
+# Contact plan definitions
+# a contact start_time stop_time source_node dest_node xmit_data_rate(bytes/s) [confidence]
+a contact +1 +86400 180 180 500000
+a contact +1 +86400 170 180 250000
+a contact +1 +86400 180 170 250000
+
+# a range start_time stop_time one_node the_other_node distance
+a range +1 +86400 180 180 1
+a range +1 +86400 170 180 1
+a range +1 +86400 180 170 1
+
+m production -1
+m consumption -1
+## end ionadmin
+
+## begin ltpadmin
+1 100 
+#a span peer_engine_nbr max_export_sessions max_import_sessions max_segment_size aggregation_size_threshold aggregation_time_limit 'LSO_command' [queuing_latency]
+a span 170 100 100 64000 10000 1 'udplso 200.200.200.170:1113 40000000'
+s 'udplsi 0.0.0.0:1113'
+
+## end ltpadmin
+
+## begin bpadmin
+1
+a scheme ipn 'ipnfw' 'ipnadminep'
+a endpoint ipn:180.0 q
+a endpoint ipn:180.1 q
+a endpoint ipn:180.2 q
+
+a protocol ltp
+a protocol udp
+
+a induct udp 0.0.0.0 udpcli
+a induct ltp 1 ltpcli
+
+a outduct udp 127.0.0.1 udpclo
+a outduct ltp 170 ltpclo
+
+s
+## end bpadmin
+
+## begin ipnadmin
+a plan 180 udp/127.0.0.1
+a plan 170 ltp/170
+## end ipnadmin
+
+## begin ionsecadmin
+1
+## end ionsecadmin
+
