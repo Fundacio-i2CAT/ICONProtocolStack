@@ -52,9 +52,9 @@ void setup_routes(enum node_type ntype);
 // It's contents must comply with the addresses used in testbed_setup.h
 #define SAT_ION_CONFIG_FILE "node170.ionconfig"
 // BP endpoint ID of the satellite bundle node who handles the MO flow
-const char *SAT_MO_EID = "ipn:170.1";
+#define SAT_MO_EID "ipn:170.1"
 // BP endpoint ID of the satellite bundle node who handles the MT flow
-const char *SAT_MT_EID = "ipn:170.2";
+#define SAT_MT_EID "ipn:170.2"
 
 //-------------------------------------------------------------------------------------Bundle Agent
 
@@ -68,9 +68,9 @@ const char *SAT_MT_EID = "ipn:170.2";
 // It's contents must comply with the addresses used in testbed_setup.h
 #define BA_ION_CONFIG_FILE "node180.ionconfig"
 // BP endpoint ID of the BA bundle node who handles the MO flow
-const char *BA_MO_EID = "ipn:180.1";
+#define BA_MO_EID "ipn:180.1"
 // BP endpoint ID of the BA bundle node who handles the MT flow
-const char *BA_MT_EID = "ipn:180.2";
+#define BA_MT_EID "ipn:180.2"
 
 //-------------------------------------------------------------------------------------Core Network
 
